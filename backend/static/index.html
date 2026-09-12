@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Screenshot to Task — AI Life Organizer</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>📸 Screenshot → Task</h1>
+      <p class="subtitle">Upload a screenshot, flyer, or bill. We'll read it and turn it into a task.</p>
+    </header>
+
+    <section id="drop-zone" class="drop-zone">
+      <input type="file" id="file-input" accept="image/*,.pdf" hidden />
+      <div class="drop-inner">
+        <div class="drop-icon">⬆️</div>
+        <p><strong>Click to upload</strong> or drag & drop</p>
+        <p class="hint">Images (PNG/JPG) or PDF — bills, flyers, screenshots</p>
+      </div>
+    </section>
+
+    <div id="upload-status" class="upload-status hidden"></div>
+
+    <section class="tasks-section">
+      <div class="tasks-header">
+        <h2>Your Tasks</h2>
+        <div class="filters">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="high">High priority</button>
+          <button class="filter-btn" data-filter="event">Events</button>
+          <button class="filter-btn" data-filter="bill">Bills</button>
+        </div>
+      </div>
+      <div id="task-list" class="task-list"></div>
+      <p id="empty-state" class="empty-state hidden">No tasks yet — upload something above to get started.</p>
+    </section>
+  </div>
+
+  <!-- Modal for viewing/editing a task -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

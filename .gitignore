@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.sqlite3
+backend/credentials.json
+backend/token.json
+uploads/*
+!uploads/.gitkeep
+.vscode/

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta
+        name="description"
+        content="Screenshot-to-Task is an AI-powered life organizer that turns screenshots, PDFs and text into organized tasks and events."
+    >
+
+    <meta name="theme-color" content="#07111f">
+
+    <title>Screenshot-to-Task | AI Life Organizer</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Animated Background -->
+    <div class="background">
+        <div class="grid-background"></div>
+
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <div class="particles">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
+
+    <!-- Header -->
+    <header class="site-header">
+
+        <div class="header-inner">
+
+            <a href="#" class="brand">
+                <div class="brand-icon">✦</div>
+
+                <div class="brand-text">
+                    <strong>Screenshot-to-Task</strong>
+                    <span>AI LIFE ORGANIZER</span>
+                </div>
+            </a>
+
+
+            <button
+                id="cal"
+                class="calendar-connect-btn"
+                type="button"
+            >
+                <span>◫</span>
+                Connect Calendar
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <main>
+
+
+        <!-- HERO -->
+        <section class="hero">
+
+            <div class="hero-content">
+
+                <div class="hero-badge">
+                    <span class="pulse-dot"></span>
+                    GENERATIVE + AGENTIC AI
+                </div>
+
+                <h1>
+                    Transform Information
+                    <span>Into Intelligent Action.</span>
+                </h1>
+
+                <p class="hero-description">
+                    Turn screenshots, WhatsApp messages, event flyers,
+                    bills, PDFs and random text into organized tasks,
+                    events and useful information automatically.
+                </p>
+
+
+                <div class="hero-stats">
+
+                    <div class="hero-stat">
+                        <strong>01</strong>
+                        <span>Capture</span>
+                    </div>
+
+                    <div class="hero-stat">
+                        <strong>02</strong>
+                        <span>Understand</span>
+                    </div>
+
+                    <div class="hero-stat">
+                        <strong>03</strong>
+                        <span>Organize</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- AI VISUAL -->
+            <div class="ai-window">
+
+                <div class="window-topbar">
+                    <div class="window-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                    <div class="window-title">
+                        AI Processing
+                    </div>
+
+                    <div class="window-status">
+                        ● LIVE
+                    </div>
+                </div>
+
+
+                <div class="ai-flow">
+
+                    <div class="flow-item">
+                        <div class="flow-icon">▣</div>
+                        <span>Screenshot</span>
+                    </div>
+
+                    <div class="flow-line">
+                        <span></span>
+                    </div>
+
+                    <div class="flow-item">
+                        <div class="flow-icon">⌕</div>
+                        <span>OCR</span>
+                    </div>
+
+                    <div class="flow-line">
+                        <span></span>
+                    </div>
+
+                    <div class="flow-item active">
+                        <div class="flow-icon">✦</div>
+                        <span>AI</span>
+                    </div>
+
+                    <div class="flow-line">
+                        <span></span>
+                    </div>
+
+                    <div class="flow-item">
+                        <div class="flow-icon">✓</div>
+                        <span>Action</span>
+                    </div>
+
+                </div>
+
+
+                <div class="ai-message">
+                    <div class="ai-message-icon">✦</div>
+
+                    <div>
+                        <strong>AI Agent</strong>
+                        <p>
+                            Detecting useful information and
+                            organizing your data...
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- INTRO -->
+        <section class="section-intro">
+
+            <div>
+                <span class="section-label">01 / CAPTURE</span>
+
+                <h2>
+                    Give your information
+                    <span>to the AI.</span>
+                </h2>
+            </div>
+
+            <p>
+                Upload almost anything. The AI will inspect the content,
+                extract useful information and decide what should happen
+                next.
+            </p>
+
+        </section>
+
+
+
+        <!-- CAPTURE SECTION -->
+        <section class="workspace">
+
+            <div class="capture-card card">
+
+                <div class="card-header">
+
+                    <div>
+                        <span class="mini-label">INPUT</span>
+
+                        <h3>
+                            Upload or paste information
+                        </h3>
+
+                        <p>
+                            Screenshots, images, PDFs or plain text.
+                        </p>
+                    </div>
+
+                    <div class="card-number">
+                        01
+                    </div>
+
+                </div>
+
+
+                <!-- Upload -->
+                <label
+                    id="drop"
+                    class="drop-zone"
+                    for="file"
+                >
+
+                    <input
+                        id="file"
+                        type="file"
+                        accept="image/*,.pdf"
+                        hidden
+                    >
+
+                    <div class="upload-icon">
+                        ↑
+                    </div>
+
+                    <strong>
+                        Drop your file here
+                    </strong>
+
+                    <span>
+                        or tap to browse
+                    </span>
+
+                    <small>
+                        JPG, PNG, WEBP, PDF • Maximum 15MB
+                    </small>
+
+                </label>
+
+
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+
+
+                <!-- Text -->
+                <div class="text-input-wrapper">
+
+                    <label for="txt">
+                        Paste text
+                    </label>
+
+                    <textarea
+                        id="txt"
+                        placeholder="Paste a WhatsApp message, event details, bill information, notes, address, contact information or any other text..."
+                    ></textarea>
+
+                </div>
+
+
+                <button
+                    id="analyze"
+                    class="primary-btn analyze-btn"
+                    type="button"
+                >
+                    <span class="btn-icon">✦</span>
+                    Analyze with AI
+                    <span class="btn-arrow">→</span>
+                </button>
+
+
+                <div
+                    id="status"
+                    class="status"
+                    aria-live="polite"
+                ></div>
+
+            </div>
+
+
+
+            <!-- RESULTS -->
+            <div
+                id="result"
+                class="result-card card empty-result"
+            >
+
+                <div class="empty-state">
+
+                    <div class="empty-icon">
+                        ✦
+                    </div>
+
+                    <h3>
+                        Your AI results will appear here
+                    </h3>
+
+                    <p>
+                        Upload a screenshot or paste text to
+                        start extracting information.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- TASKS -->
+        <section class="tasks-section">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="section-label">
+                        02 / ORGANIZE
+                    </span>
+
+                    <h2>
+                        Your <span>Tasks</span>
+                    </h2>
+
+                    <p>
+                        Information saved from your AI analysis.
+                    </p>
+                </div>
+
+                <button
+                    id="refresh"
+                    class="secondary-btn"
+                    type="button"
+                >
+                    ↻ Refresh
+                </button>
+
+            </div>
+
+
+            <div
+                id="tasks"
+                class="tasks-grid"
+            ></div>
+
+        </section>
+
+
+
+        <!-- TEAM -->
+        <section class="team-section">
+
+            <div class="section-heading team-heading">
+
+                <div>
+                    <span class="section-label">
+                        03 / OUR TEAM
+                    </span>
+
+                    <h2>
+                        Meet the <span>Team</span>
+                    </h2>
+
+                    <p>
+                        The people behind Screenshot-to-Task.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="team-grid">
+
+
+                <!-- Hasnain -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        HK
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Hasnain Khan</h3>
+                        <span>Team Leader</span>
+                    </div>
+
+                    <div class="team-index">
+                        01
+                    </div>
+
+                </article>
+
+
+                <!-- Zain -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        ZR
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Zain Rauf</h3>
+                        <span>Team Member</span>
+                    </div>
+
+                    <div class="team-index">
+                        02
+                    </div>
+
+                </article>
+
+
+                <!-- Ammara -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        AK
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Ammara Khalid</h3>
+                        <span>Team Member</span>
+                    </div>
+
+                    <div class="team-index">
+                        03
+                    </div>
+
+                </article>
+
+
+                <!-- Saiqa -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        SQ
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Saiqa</h3>
+                        <span>Team Member</span>
+                    </div>
+
+                    <div class="team-index">
+                        04
+                    </div>
+
+                </article>
+
+
+                <!-- Laiba -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        LB
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Laiba</h3>
+                        <span>Team Member</span>
+                    </div>
+
+                    <div class="team-index">
+                        05
+                    </div>
+
+                </article>
+
+
+                <!-- Ayesha -->
+                <article class="team-card">
+
+                    <div class="team-avatar">
+                        AY
+                    </div>
+
+                    <div class="team-info">
+                        <h3>Ayesha</h3>
+                        <span>Team Member</span>
+                    </div>
+
+                    <div class="team-index">
+                        06
+                    </div>
+
+                </article>
+
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- FOOTER -->
+    <footer class="footer">
+
+        <div class="footer-inner">
+
+            <div>
+                <strong>
+                    ✦ Screenshot-to-Task
+                </strong>
+
+                <p>
+                    Intelligent information management powered by AI.
+                </p>
+            </div>
+
+            <span>
+                © 2026 Screenshot-to-Task
+            </span>
+
+        </div>
+
+    </footer>
+
+
+
+    <!-- PDF library -->
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+    ></script>
+
+    <!-- Application JavaScript -->
+    <script src="app.js"></script>
+
+</body>
+</html>
