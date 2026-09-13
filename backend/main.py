@@ -9,13 +9,10 @@ from fastapi import (
     UploadFile,
     File,
 )
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from database import engine, get_db, Base
-import schemas
 from models.task import Task
 
 from ocr_utils import extract_text, get_file_type
@@ -39,13 +36,13 @@ BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
 )
 
-# Uploaded files
+# Temporary uploaded files
 UPLOAD_DIR = os.path.join(
     BASE_DIR,
     "uploads"
 )
 
-# New frontend directory
+# Frontend directory
 # backend/../frontend/
 FRONTEND_DIR = os.path.abspath(
     os.path.join(
@@ -62,35 +59,47 @@ os.makedirs(
 
 
 # ============================================================
+# SECURITY SETTINGS
+# ============================================================
+
+# Maximum upload size = 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# Allowed upload extensions
+ALLOWED_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".bmp",
+    ".tiff",
+    ".gif",
+    ".pdf",
+}
+
+
+# ============================================================
 # FASTAPI
 # ============================================================
 
 app = FastAPI(
-    title="Screenshot-to-Task API"
+    title="Screenshot-to-Task API",
+
+    # Disable public API documentation
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 
 # ============================================================
-# CORS
+# SECURITY HELPERS
 # ============================================================
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# ============================================================
-# ANALYZE UPLOADED IMAGE / PDF
-# ============================================================
-
-@app.post("/api/analyze")
-async def analyze_file(
-    file: UploadFile = File(...)
-):
+def validate_upload(file: UploadFile):
+    """
+    Validate uploaded file name and extension.
+    """
 
     if not file.filename:
         raise HTTPException(
@@ -98,19 +107,33 @@ async def analyze_file(
             detail="No file selected."
         )
 
-    file_type = get_file_type(
+    extension = os.path.splitext(
         file.filename
-    )
+    )[1].lower()
 
-    if file_type == "unknown":
+    if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=(
                 "Unsupported file type. "
-                "Upload PNG, JPG, JPEG, WEBP, "
-                "BMP, TIFF, GIF or PDF."
+                "Allowed formats: PNG, JPG, JPEG, "
+                "WEBP, BMP, TIFF, GIF and PDF."
             )
         )
+
+    return extension
+
+
+async def save_upload_temporarily(
+    file: UploadFile,
+):
+    """
+    Save uploaded file with a random filename.
+
+    Maximum size: 10 MB.
+    """
+
+    validate_upload(file)
 
     safe_name = (
         f"{uuid.uuid4().hex}_"
@@ -122,21 +145,112 @@ async def analyze_file(
         safe_name
     )
 
-    try:
+    total_size = 0
 
-        # ----------------------------------------------------
-        # Save uploaded file temporarily
-        # ----------------------------------------------------
+    try:
 
         with open(
             dest_path,
             "wb"
         ) as out_file:
 
-            shutil.copyfileobj(
-                file.file,
-                out_file
+            while True:
+
+                chunk = await file.read(
+                    1024 * 1024
+                )
+
+                if not chunk:
+                    break
+
+                total_size += len(chunk)
+
+                if total_size > MAX_FILE_SIZE:
+
+                    # Delete oversized file
+                    if os.path.exists(dest_path):
+                        os.remove(dest_path)
+
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            "File is too large. "
+                            "Maximum file size is 10 MB."
+                        )
+                    )
+
+                out_file.write(chunk)
+
+        return dest_path
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+
+        print(
+            "File save error:",
+            error
+        )
+
+        if os.path.exists(dest_path):
+
+            try:
+                os.remove(dest_path)
+            except Exception:
+                pass
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save the uploaded file."
+        )
+
+
+def delete_temp_file(
+    file_path: str
+):
+    """
+    Safely delete temporary uploaded file.
+    """
+
+    if not file_path:
+        return
+
+    if os.path.exists(file_path):
+
+        try:
+            os.remove(file_path)
+
+        except Exception as error:
+
+            print(
+                "Temporary file deletion error:",
+                error
             )
+
+
+# ============================================================
+# ANALYZE UPLOADED IMAGE / PDF
+# ============================================================
+
+@app.post("/api/analyze")
+async def analyze_file(
+    file: UploadFile = File(...)
+):
+
+    validate_upload(file)
+
+    dest_path = None
+
+    try:
+
+        # ----------------------------------------------------
+        # Save uploaded file temporarily
+        # ----------------------------------------------------
+
+        dest_path = await save_upload_temporarily(
+            file
+        )
 
         # ----------------------------------------------------
         # OCR
@@ -151,12 +265,19 @@ async def analyze_file(
 
         except Exception as ocr_error:
 
-            raw_text = (
-                f"[OCR_ERROR] "
-                f"{str(ocr_error)}"
+            print(
+                "OCR error:",
+                ocr_error
             )
 
-            source_type = file_type
+            raw_text = (
+                "[OCR_ERROR] "
+                "Unable to extract text from this file."
+            )
+
+            source_type = get_file_type(
+                file.filename
+            )
 
         # ----------------------------------------------------
         # AI EXTRACTION
@@ -178,7 +299,12 @@ async def analyze_file(
                 extracted
             )
 
-        except Exception:
+        except Exception as agent_error:
+
+            print(
+                "Agent error:",
+                agent_error
+            )
 
             agent_result = {
                 "decision": [
@@ -204,9 +330,19 @@ async def analyze_file(
 
     except Exception as error:
 
+        # Technical details stay in server terminal
+        print(
+            "Analysis error:",
+            error
+        )
+
+        # Public user receives safe message
         raise HTTPException(
             status_code=500,
-            detail=f"Analysis failed: {str(error)}"
+            detail=(
+                "Analysis failed. "
+                "Please try again."
+            )
         )
 
     finally:
@@ -215,13 +351,14 @@ async def analyze_file(
         # Delete temporary uploaded file
         # ----------------------------------------------------
 
-        if os.path.exists(dest_path):
+        delete_temp_file(
+            dest_path
+        )
 
-            try:
-                os.remove(dest_path)
-
-            except Exception:
-                pass
+        try:
+            await file.close()
+        except Exception:
+            pass
 
 
 # ============================================================
@@ -238,17 +375,37 @@ async def analyze_text_endpoint(
         ""
     )
 
-    if not text or not text.strip():
+    if not isinstance(text, str):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid text input."
+        )
+
+    text = text.strip()
+
+    if not text:
 
         raise HTTPException(
             status_code=400,
             detail="Text cannot be empty."
         )
 
+    # Prevent extremely large text submissions
+    if len(text) > 100000:
+
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "Text is too large. "
+                "Maximum allowed length is 100,000 characters."
+            )
+        )
+
     try:
 
         extracted = analyze_text(
-            text.strip()
+            text
         )
 
         try:
@@ -259,7 +416,12 @@ async def analyze_text_endpoint(
                 extracted
             )
 
-        except Exception:
+        except Exception as agent_error:
+
+            print(
+                "Agent error:",
+                agent_error
+            )
 
             agent_result = {
                 "decision": [
@@ -276,11 +438,16 @@ async def analyze_text_endpoint(
 
     except Exception as error:
 
+        print(
+            "Text analysis error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Text analysis failed: "
-                f"{str(error)}"
+                "Text analysis failed. "
+                "Please try again."
             )
         )
 
@@ -295,53 +462,19 @@ async def upload_file(
     db: Session = Depends(get_db)
 ):
 
-    if not file.filename:
+    validate_upload(file)
 
-        raise HTTPException(
-            status_code=400,
-            detail="No file selected."
-        )
-
-    file_type = get_file_type(
-        file.filename
-    )
-
-    if file_type == "unknown":
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Unsupported file type. "
-                "Upload PNG, JPG, JPEG, WEBP, "
-                "BMP, TIFF, GIF or PDF."
-            )
-        )
-
-    safe_name = (
-        f"{uuid.uuid4().hex}_"
-        f"{os.path.basename(file.filename)}"
-    )
-
-    dest_path = os.path.join(
-        UPLOAD_DIR,
-        safe_name
-    )
+    dest_path = None
 
     try:
 
         # ----------------------------------------------------
-        # Save uploaded file
+        # Save uploaded file temporarily
         # ----------------------------------------------------
 
-        with open(
-            dest_path,
-            "wb"
-        ) as out_file:
-
-            shutil.copyfileobj(
-                file.file,
-                out_file
-            )
+        dest_path = await save_upload_temporarily(
+            file
+        )
 
         # ----------------------------------------------------
         # OCR
@@ -356,12 +489,19 @@ async def upload_file(
 
         except Exception as ocr_error:
 
-            raw_text = (
-                f"[OCR_ERROR] "
-                f"{str(ocr_error)}"
+            print(
+                "OCR error:",
+                ocr_error
             )
 
-            source_type = file_type
+            raw_text = (
+                "[OCR_ERROR] "
+                "Unable to extract text from this file."
+            )
+
+            source_type = get_file_type(
+                file.filename
+            )
 
         # ----------------------------------------------------
         # AI EXTRACTION
@@ -403,8 +543,8 @@ async def upload_file(
                 or extracted.get("event_time")
             ),
 
-            location=extracted.get(
-                "location"
+            location=(
+                extracted.get("location")
             ),
 
             priority=(
@@ -412,36 +552,36 @@ async def upload_file(
                 or "medium"
             ),
 
-            person=extracted.get(
-                "person"
+            person=(
+                extracted.get("person")
             ),
 
-            amount=extracted.get(
-                "amount"
+            amount=(
+                extracted.get("amount")
             ),
 
-            currency=extracted.get(
-                "currency"
+            currency=(
+                extracted.get("currency")
             ),
 
-            phone=extracted.get(
-                "phone"
+            phone=(
+                extracted.get("phone")
             ),
 
-            email=extracted.get(
-                "email"
+            email=(
+                extracted.get("email")
             ),
 
-            url=extracted.get(
-                "url"
+            url=(
+                extracted.get("url")
             ),
 
-            organization=extracted.get(
-                "organization"
+            organization=(
+                extracted.get("organization")
             ),
 
-            summary=extracted.get(
-                "summary"
+            summary=(
+                extracted.get("summary")
             ),
 
             raw_extraction=extracted,
@@ -464,20 +604,30 @@ async def upload_file(
 
         db.rollback()
 
+        print(
+            "Upload/task error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
-            detail=f"Upload failed: {str(error)}"
+            detail=(
+                "Upload failed. "
+                "Please try again."
+            )
         )
 
     finally:
 
-        if os.path.exists(dest_path):
+        # Delete temporary uploaded file
+        delete_temp_file(
+            dest_path
+        )
 
-            try:
-                os.remove(dest_path)
-
-            except Exception:
-                pass
+        try:
+            await file.close()
+        except Exception:
+            pass
 
 
 # ============================================================
@@ -489,6 +639,16 @@ def create_task(
     task_data: dict,
     db: Session = Depends(get_db)
 ):
+
+    if not isinstance(
+        task_data,
+        dict
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid task data."
+        )
 
     title = (
         task_data.get("title")
@@ -551,11 +711,15 @@ def create_task(
 
         db.rollback()
 
+        print(
+            "Create task error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Could not save task: "
-                f"{str(error)}"
+                "Could not save task."
             )
         )
 
@@ -569,13 +733,27 @@ def list_tasks(
     db: Session = Depends(get_db)
 ):
 
-    return (
-        db.query(Task)
-        .order_by(
-            Task.created_at.desc()
+    try:
+
+        return (
+            db.query(Task)
+            .order_by(
+                Task.created_at.desc()
+            )
+            .all()
         )
-        .all()
-    )
+
+    except Exception as error:
+
+        print(
+            "List tasks error:",
+            error
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not load tasks."
+        )
 
 
 # ============================================================
@@ -600,7 +778,7 @@ def get_task(
 
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found."
         )
 
     return task
@@ -629,7 +807,7 @@ def update_task(
 
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found."
         )
 
     allowed_fields = {
@@ -674,11 +852,15 @@ def update_task(
 
         db.rollback()
 
+        print(
+            "Update task error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Could not update task: "
-                f"{str(error)}"
+                "Could not update task."
             )
         )
 
@@ -705,7 +887,7 @@ def delete_task(
 
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found."
         )
 
     try:
@@ -722,11 +904,15 @@ def delete_task(
 
         db.rollback()
 
+        print(
+            "Delete task error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Could not delete task: "
-                f"{str(error)}"
+                "Could not delete task."
             )
         )
 
@@ -753,7 +939,7 @@ def add_to_calendar(
 
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found."
         )
 
     if not task.event_date:
@@ -790,6 +976,11 @@ def add_to_calendar(
 
     except calendar_utils.CalendarNotConfigured as error:
 
+        print(
+            "Calendar configuration error:",
+            error
+        )
+
         raise HTTPException(
             status_code=400,
             detail=str(error)
@@ -797,11 +988,15 @@ def add_to_calendar(
 
     except Exception as error:
 
+        print(
+            "Google Calendar error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Google Calendar error: "
-                f"{str(error)}"
+                "Google Calendar operation failed."
             )
         )
 
@@ -827,6 +1022,11 @@ def calendar_connect():
 
     except calendar_utils.CalendarNotConfigured as error:
 
+        print(
+            "Calendar configuration error:",
+            error
+        )
+
         raise HTTPException(
             status_code=400,
             detail=str(error)
@@ -834,9 +1034,16 @@ def calendar_connect():
 
     except Exception as error:
 
+        print(
+            "Calendar connect error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
-            detail=str(error)
+            detail=(
+                "Could not connect to Google Calendar."
+            )
         )
 
 
@@ -912,6 +1119,11 @@ def create_calendar_event(
 
     except calendar_utils.CalendarNotConfigured as error:
 
+        print(
+            "Calendar configuration error:",
+            error
+        )
+
         raise HTTPException(
             status_code=400,
             detail=str(error)
@@ -919,11 +1131,15 @@ def create_calendar_event(
 
     except Exception as error:
 
+        print(
+            "Google Calendar event error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Google Calendar error: "
-                f"{str(error)}"
+                "Google Calendar event creation failed."
             )
         )
 
@@ -957,6 +1173,11 @@ def calendar_callback(
 
     except calendar_utils.CalendarNotConfigured as error:
 
+        print(
+            "Calendar configuration error:",
+            error
+        )
+
         raise HTTPException(
             status_code=400,
             detail=str(error)
@@ -964,48 +1185,65 @@ def calendar_callback(
 
     except Exception as error:
 
+        print(
+            "Calendar callback error:",
+            error
+        )
+
         raise HTTPException(
             status_code=500,
-            detail=str(error)
+            detail=(
+                "Google Calendar authorization failed."
+            )
         )
 
 
 # ============================================================
-# SERVE FRONTEND STATIC FILES
-# ============================================================
-#
-# This serves:
-#
-# frontend/app.js
-# frontend/style.css
-#
-# through:
-#
-# /app.js
-# /style.css
-#
+# SERVE FRONTEND JAVASCRIPT
 # ============================================================
 
 @app.get("/app.js")
 def serve_app_js():
 
+    file_path = os.path.join(
+        FRONTEND_DIR,
+        "app.js"
+    )
+
+    if not os.path.exists(file_path):
+
+        raise HTTPException(
+            status_code=404,
+            detail="Frontend JavaScript file not found."
+        )
+
     return FileResponse(
-        os.path.join(
-            FRONTEND_DIR,
-            "app.js"
-        ),
+        file_path,
         media_type="application/javascript"
     )
 
 
+# ============================================================
+# SERVE FRONTEND CSS
+# ============================================================
+
 @app.get("/style.css")
 def serve_style_css():
 
+    file_path = os.path.join(
+        FRONTEND_DIR,
+        "style.css"
+    )
+
+    if not os.path.exists(file_path):
+
+        raise HTTPException(
+            status_code=404,
+            detail="Frontend CSS file not found."
+        )
+
     return FileResponse(
-        os.path.join(
-            FRONTEND_DIR,
-            "style.css"
-        ),
+        file_path,
         media_type="text/css"
     )
 
@@ -1026,10 +1264,7 @@ def serve_index():
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Frontend index.html not found at: "
-                f"{index_file}"
-            )
+            detail="Frontend index.html not found."
         )
 
     return FileResponse(

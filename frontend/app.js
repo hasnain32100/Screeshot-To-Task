@@ -3,7 +3,11 @@
    FRONTEND APPLICATION
 ========================================================= */
 
-const API = "http://127.0.0.1:8000";
+// Same-origin API.
+// The frontend and FastAPI backend are served from the same
+// Cloudflare public URL, so no localhost or external API URL
+// is required.
+const API = "";
 
 
 // =========================================================
@@ -46,6 +50,10 @@ function escapeHtml(value) {
 
 function setStatus(message, type = "") {
 
+    if (!statusBox) {
+        return;
+    }
+
     statusBox.textContent = message;
 
     statusBox.className = "status";
@@ -67,11 +75,13 @@ function formatValue(value) {
     }
 
     if (typeof value === "object") {
+
         try {
             return JSON.stringify(value, null, 2);
         } catch {
             return String(value);
         }
+
     }
 
     return String(value);
@@ -84,10 +94,14 @@ function capitalize(value) {
         return "";
     }
 
-    return String(value)
-        .charAt(0)
-        .toUpperCase() +
+    return String(value).charAt(0).toUpperCase() +
         String(value).slice(1);
+}
+
+
+function getApiUrl(path) {
+
+    return path;
 }
 
 
@@ -95,126 +109,152 @@ function capitalize(value) {
 // FILE SELECTION
 // =========================================================
 
-fileInput.addEventListener("change", function () {
+if (fileInput) {
 
-    if (!this.files || !this.files.length) {
-        return;
-    }
+    fileInput.addEventListener("change", function () {
 
-    const file = this.files[0];
+        if (!this.files || !this.files.length) {
+            return;
+        }
 
-    if (file.size > 15 * 1024 * 1024) {
+        const file = this.files[0];
+
+        if (file.size > 15 * 1024 * 1024) {
+
+            setStatus(
+                "File is too large. Maximum size is 15MB.",
+                "error"
+            );
+
+            this.value = "";
+
+            return;
+        }
 
         setStatus(
-            "File is too large. Maximum size is 15MB."
+            `Selected: ${file.name}`
         );
 
-        this.value = "";
+    });
 
-        return;
-    }
-
-    setStatus(
-        `Selected: ${file.name}`
-    );
-
-});
+}
 
 
 // =========================================================
 // DRAG & DROP
 // =========================================================
 
-["dragenter", "dragover"].forEach(eventName => {
+if (dropZone) {
 
-    dropZone.addEventListener(eventName, event => {
+    ["dragenter", "dragover"].forEach(eventName => {
 
-        event.preventDefault();
+        dropZone.addEventListener(eventName, event => {
 
-        dropZone.classList.add("dragover");
+            event.preventDefault();
 
-    });
+            dropZone.classList.add("dragover");
 
-});
-
-
-["dragleave", "drop"].forEach(eventName => {
-
-    dropZone.addEventListener(eventName, event => {
-
-        event.preventDefault();
-
-        dropZone.classList.remove("dragover");
+        });
 
     });
 
-});
+
+    ["dragleave", "drop"].forEach(eventName => {
+
+        dropZone.addEventListener(eventName, event => {
+
+            event.preventDefault();
+
+            dropZone.classList.remove("dragover");
+
+        });
+
+    });
 
 
-dropZone.addEventListener("drop", event => {
+    dropZone.addEventListener("drop", event => {
 
-    const files = event.dataTransfer.files;
+        const files = event.dataTransfer.files;
 
-    if (!files.length) {
-        return;
-    }
+        if (!files || !files.length) {
+            return;
+        }
 
-    const file = files[0];
+        const file = files[0];
 
-    if (file.size > 15 * 1024 * 1024) {
+        if (file.size > 15 * 1024 * 1024) {
+
+            setStatus(
+                "File is too large. Maximum size is 15MB.",
+                "error"
+            );
+
+            return;
+        }
+
+        try {
+            fileInput.files = files;
+        } catch (error) {
+            console.error(error);
+        }
 
         setStatus(
-            "File is too large. Maximum size is 15MB."
+            `Selected: ${file.name}`
         );
 
-        return;
-    }
+    });
 
-    fileInput.files = files;
-
-    setStatus(
-        `Selected: ${file.name}`
-    );
-
-});
+}
 
 
 // =========================================================
 // ANALYZE BUTTON
 // =========================================================
 
-analyzeButton.addEventListener(
-    "click",
-    analyzeInput
-);
+if (analyzeButton) {
+
+    analyzeButton.addEventListener(
+        "click",
+        analyzeInput
+    );
+
+}
 
 
 async function analyzeInput() {
 
     const file =
+        fileInput &&
         fileInput.files &&
         fileInput.files[0];
 
     const text =
-        textInput.value.trim();
+        textInput ?
+        textInput.value.trim() :
+        "";
 
 
     if (!file && !text) {
 
         setStatus(
-            "Please upload a file or paste some text first."
+            "Please upload a file or paste some text first.",
+            "error"
         );
 
         return;
     }
 
 
-    analyzeButton.disabled = true;
+    if (analyzeButton) {
 
-    analyzeButton.innerHTML =
-        `<span class="btn-icon">◌</span>
-         Analyzing...
-         <span class="btn-arrow">...</span>`;
+        analyzeButton.disabled = true;
+
+        analyzeButton.innerHTML =
+            `<span class="btn-icon">◌</span>
+             Analyzing...
+             <span class="btn-arrow">...</span>`;
+
+    }
 
 
     setStatus(
@@ -227,9 +267,9 @@ async function analyzeInput() {
         let data;
 
 
-        // -------------------------------------------------
+        // =================================================
         // FILE ANALYSIS
-        // -------------------------------------------------
+        // =================================================
 
         if (file) {
 
@@ -238,8 +278,21 @@ async function analyzeInput() {
             formData.append("file", file);
 
 
+            /*
+             * IMPORTANT:
+             * Use SAME-ORIGIN endpoint.
+             *
+             * Do NOT use:
+             * http://127.0.0.1:8000
+             * http://localhost:8000
+             * Cloudflare URL
+             *
+             * The browser automatically uses the current
+             * public domain.
+             */
+
             const response = await fetch(
-                `${API}/api/analyze`,
+                "/api/analyze",
                 {
                     method: "POST",
                     body: formData
@@ -264,20 +317,19 @@ async function analyzeInput() {
         }
 
 
-        // -------------------------------------------------
+        // =================================================
         // TEXT ANALYSIS
-        // -------------------------------------------------
+        // =================================================
 
         else {
 
             const response = await fetch(
-                `${API}/api/analyze-text`,
+                "/api/analyze-text",
                 {
                     method: "POST",
 
                     headers: {
-                        "Content-Type":
-                            "application/json"
+                        "Content-Type": "application/json"
                     },
 
                     body: JSON.stringify({
@@ -304,34 +356,50 @@ async function analyzeInput() {
         }
 
 
-        latestResult = data;
+        // =================================================
+        // SUCCESS
+        // =================================================
 
+        latestResult = data;
 
         renderResult(data);
 
 
         setStatus(
-            "Analysis completed successfully."
+            "Analysis completed successfully.",
+            "success"
         );
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Screenshot-to-Task analyze error:",
+            error
+        );
+
 
         setStatus(
             "Error: " +
-            (error.message || "Unable to analyze.")
+            (
+                error.message ||
+                "Unable to analyze."
+            ),
+            "error"
         );
 
     } finally {
 
-        analyzeButton.disabled = false;
+        if (analyzeButton) {
 
-        analyzeButton.innerHTML =
-            `<span class="btn-icon">✦</span>
-             Analyze with AI
-             <span class="btn-arrow">→</span>`;
+            analyzeButton.disabled = false;
+
+            analyzeButton.innerHTML =
+                `<span class="btn-icon">✦</span>
+                 Analyze with AI
+                 <span class="btn-arrow">→</span>`;
+
+        }
 
     }
 
@@ -344,7 +412,7 @@ async function analyzeInput() {
 
 function renderResult(data) {
 
-    if (!data) {
+    if (!data || !resultBox) {
         return;
     }
 
@@ -422,9 +490,9 @@ function renderResult(data) {
     );
 
 
-    // -----------------------------------------------------
-    // Additional AI fields
-    // -----------------------------------------------------
+    // =====================================================
+    // ADDITIONAL AI FIELDS
+    // =====================================================
 
     Object.entries(extraction)
         .forEach(([key, value]) => {
@@ -461,9 +529,9 @@ function renderResult(data) {
         });
 
 
-    // -----------------------------------------------------
-    // Agent information
-    // -----------------------------------------------------
+    // =====================================================
+    // AGENT INFORMATION
+    // =====================================================
 
     let agentHtml = "";
 
@@ -501,9 +569,9 @@ function renderResult(data) {
     }
 
 
-    // -----------------------------------------------------
-    // Raw OCR
-    // -----------------------------------------------------
+    // =====================================================
+    // RAW OCR
+    // =====================================================
 
     let ocrHtml = "";
 
@@ -527,9 +595,9 @@ function renderResult(data) {
     }
 
 
-    // -----------------------------------------------------
-    // Result HTML
-    // -----------------------------------------------------
+    // =====================================================
+    // RESULT HTML
+    // =====================================================
 
     resultBox.innerHTML = `
 
@@ -644,6 +712,7 @@ function renderResult(data) {
 
 
     // Scroll result into view on mobile
+
     if (window.innerWidth <= 600) {
 
         setTimeout(() => {
@@ -719,7 +788,8 @@ async function copyExtractedInfo() {
         await navigator.clipboard.writeText(text);
 
         setStatus(
-            "Extracted information copied."
+            "Extracted information copied.",
+            "success"
         );
 
     } catch (error) {
@@ -877,12 +947,12 @@ async function saveResultAsPDF() {
 
 
     // jsPDF loaded from CDN
+
     if (
         !window.jspdf ||
         !window.jspdf.jsPDF
     ) {
 
-        // Fallback to browser printing
         window.print();
 
         return;
@@ -913,9 +983,9 @@ async function saveResultAsPDF() {
     let y = 20;
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // PDF HEADER
-    // -----------------------------------------------------
+    // =====================================================
 
     pdf.setFontSize(20);
 
@@ -968,9 +1038,9 @@ async function saveResultAsPDF() {
     y += 10;
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // TITLE
-    // -----------------------------------------------------
+    // =====================================================
 
     pdf.setFontSize(16);
 
@@ -999,9 +1069,9 @@ async function saveResultAsPDF() {
         5;
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // EXTRACTION FIELDS
-    // -----------------------------------------------------
+    // =====================================================
 
     pdf.setFontSize(10);
 
@@ -1044,7 +1114,6 @@ async function saveResultAsPDF() {
                 );
 
 
-            // Page break
             if (y > 270) {
 
                 pdf.addPage();
@@ -1088,9 +1157,9 @@ async function saveResultAsPDF() {
         });
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // SUMMARY
-    // -----------------------------------------------------
+    // =====================================================
 
     if (extraction.summary) {
 
@@ -1150,9 +1219,9 @@ async function saveResultAsPDF() {
     }
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // DESCRIPTION
-    // -----------------------------------------------------
+    // =====================================================
 
     if (extraction.description) {
 
@@ -1209,9 +1278,9 @@ async function saveResultAsPDF() {
     }
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // AI AGENT
-    // -----------------------------------------------------
+    // =====================================================
 
     const agent =
         latestResult.agent || {};
@@ -1280,9 +1349,9 @@ async function saveResultAsPDF() {
     }
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // OCR TEXT
-    // -----------------------------------------------------
+    // =====================================================
 
     if (latestResult.raw_text) {
 
@@ -1325,7 +1394,6 @@ async function saveResultAsPDF() {
             );
 
 
-        // Write OCR in chunks
         let index = 0;
 
 
@@ -1367,9 +1435,9 @@ async function saveResultAsPDF() {
     }
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // FOOTER
-    // -----------------------------------------------------
+    // =====================================================
 
     const pageCount =
         pdf.internal.getNumberOfPages();
@@ -1408,9 +1476,9 @@ async function saveResultAsPDF() {
     }
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // DOWNLOAD
-    // -----------------------------------------------------
+    // =====================================================
 
     const safeTitle =
         String(title)
@@ -1422,12 +1490,15 @@ async function saveResultAsPDF() {
 
 
     pdf.save(
-        `Screenshot-to-Task_${safeTitle || "Result"}.pdf`
+        `Screenshot-to-Task_${
+            safeTitle || "Result"
+        }.pdf`
     );
 
 
     setStatus(
-        "PDF created successfully."
+        "PDF created successfully.",
+        "success"
     );
 
 }
@@ -1537,7 +1608,7 @@ async function saveCurrentTask() {
 
         const response =
             await fetch(
-                `${API}/api/tasks`,
+                "/api/tasks",
                 {
                     method: "POST",
 
@@ -1566,7 +1637,8 @@ async function saveCurrentTask() {
 
 
         setStatus(
-            "Task saved successfully."
+            "Task saved successfully.",
+            "success"
         );
 
 
@@ -1579,7 +1651,8 @@ async function saveCurrentTask() {
 
         setStatus(
             "Could not save task: " +
-            error.message
+            error.message,
+            "error"
         );
 
     }
@@ -1593,18 +1666,25 @@ async function saveCurrentTask() {
 
 async function loadTasks() {
 
+    if (!tasksBox) {
+        return;
+    }
+
+
     try {
 
         const response =
             await fetch(
-                `${API}/api/tasks`
+                "/api/tasks"
             );
 
 
         if (!response.ok) {
+
             throw new Error(
                 "Could not load tasks."
             );
+
         }
 
 
@@ -1621,6 +1701,7 @@ async function loadTasks() {
 
         tasksBox.innerHTML = `
             <div class="task-card">
+
                 <h3>
                     Unable to load tasks
                 </h3>
@@ -1629,6 +1710,7 @@ async function loadTasks() {
                     Make sure the backend server
                     is running.
                 </p>
+
             </div>
         `;
 
@@ -1642,6 +1724,11 @@ async function loadTasks() {
 // =========================================================
 
 function renderTasks(tasks) {
+
+    if (!tasksBox) {
+        return;
+    }
+
 
     if (!tasks || !tasks.length) {
 
@@ -1795,7 +1882,7 @@ async function deleteTask(taskId) {
 
         const response =
             await fetch(
-                `${API}/api/tasks/${taskId}`,
+                `/api/tasks/${taskId}`,
                 {
                     method: "DELETE"
                 }
@@ -1831,10 +1918,14 @@ async function deleteTask(taskId) {
 // CALENDAR
 // =========================================================
 
-calendarButton.addEventListener(
-    "click",
-    connectCalendar
-);
+if (calendarButton) {
+
+    calendarButton.addEventListener(
+        "click",
+        connectCalendar
+    );
+
+}
 
 
 async function connectCalendar() {
@@ -1843,7 +1934,7 @@ async function connectCalendar() {
 
         const response =
             await fetch(
-                `${API}/api/calendar/connect`
+                "/api/calendar/connect"
             );
 
 
@@ -1937,7 +2028,7 @@ async function createCalendarEvent() {
 
         const response =
             await fetch(
-                `${API}/api/calendar/events`,
+                "/api/calendar/events",
                 {
                     method: "POST",
 
@@ -1967,7 +2058,8 @@ async function createCalendarEvent() {
 
 
         setStatus(
-            "Calendar event created successfully."
+            "Calendar event created successfully.",
+            "success"
         );
 
 
@@ -1999,10 +2091,14 @@ async function createCalendarEvent() {
 // REFRESH TASKS
 // =========================================================
 
-refreshButton.addEventListener(
-    "click",
-    loadTasks
-);
+if (refreshButton) {
+
+    refreshButton.addEventListener(
+        "click",
+        loadTasks
+    );
+
+}
 
 
 // =========================================================
@@ -2010,21 +2106,25 @@ refreshButton.addEventListener(
 // Ctrl + Enter = Analyze pasted text
 // =========================================================
 
-textInput.addEventListener(
-    "keydown",
-    event => {
+if (textInput) {
 
-        if (
-            event.ctrlKey &&
-            event.key === "Enter"
-        ) {
+    textInput.addEventListener(
+        "keydown",
+        event => {
 
-            analyzeInput();
+            if (
+                event.ctrlKey &&
+                event.key === "Enter"
+            ) {
+
+                analyzeInput();
+
+            }
 
         }
+    );
 
-    }
-);
+}
 
 
 // =========================================================
